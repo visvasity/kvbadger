@@ -16,15 +16,11 @@ import (
 	"os"
 
 	"github.com/dgraph-io/badger/v4"
-
-	"github.com/visvasity/kv"
 )
 
 type Database struct {
 	db *badger.DB
 }
-
-var _ kv.Database[*Transaction, *Snapshot] = &Database{}
 
 // New returns a key-value database instance backed by the given badger
 // database.
