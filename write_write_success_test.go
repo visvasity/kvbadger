@@ -25,7 +25,7 @@ func TestWriteWriteSuccess(t *testing.T) {
 	defer bdb.Close()
 
 	kvbdb := New(bdb)
-	db := kv.DatabaseFrom(kvbdb.NewTransaction, kvbdb.NewSnapshot)
+	db := kv.DatabaseFrom(kvbdb)
 
 	// Initialize with a key
 	err = kvutil.WithReadWriter(ctx, db, func(ctx context.Context, rw kv.ReadWriter) error {
@@ -100,7 +100,7 @@ func TestInterleavedBlindWrites(t *testing.T) {
 	defer bdb.Close()
 
 	kvbdb := New(bdb)
-	db := kv.DatabaseFrom(kvbdb.NewTransaction, kvbdb.NewSnapshot)
+	db := kv.DatabaseFrom(kvbdb)
 
 	// Initialize with a key
 	err = kvutil.WithReadWriter(ctx, db, func(ctx context.Context, rw kv.ReadWriter) error {
