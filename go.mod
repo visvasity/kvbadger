@@ -4,7 +4,8 @@ go 1.23.2
 
 require (
 	github.com/dgraph-io/badger/v4 v4.3.1
-	github.com/visvasity/kv v0.0.0-20250824163035-09b2b67d839f
+	github.com/visvasity/kv v0.0.0-20251127181103-190fe23c8632
+	github.com/visvasity/kvtests v0.0.0-20251127231113-ed5b44ddeab6
 )
 
 require (

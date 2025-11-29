@@ -9,7 +9,6 @@ package kvbadger
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"io"
 	"iter"
@@ -76,7 +75,7 @@ type txn struct {
 // Commit commits the transaction.
 func (t *txn) Commit(ctx context.Context) error {
 	if t.db == nil {
-		return sql.ErrTxDone
+		return os.ErrClosed
 	}
 	t.db = nil
 	return t.tx.Commit()
@@ -85,7 +84,7 @@ func (t *txn) Commit(ctx context.Context) error {
 // discard drops the snapshot.
 func (t *txn) discard(ctx context.Context) error {
 	if t.db == nil {
-		return sql.ErrTxDone
+		return os.ErrClosed
 	}
 	t.db = nil
 	t.tx.Discard()
@@ -94,6 +93,12 @@ func (t *txn) discard(ctx context.Context) error {
 
 // Get returns the value for a given key.
 func (t *txn) Get(ctx context.Context, k string) (io.Reader, error) {
+	if len(k) == 0 {
+		return nil, os.ErrInvalid
+	}
+	if t.db == nil {
+		return nil, os.ErrClosed
+	}
 	item, err := t.tx.Get([]byte(k))
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
@@ -111,7 +116,10 @@ func (t *txn) Get(ctx context.Context, k string) (io.Reader, error) {
 // Set stores a key-value pair.
 func (t *txn) Set(ctx context.Context, k string, v io.Reader) error {
 	if t.db == nil {
-		return sql.ErrTxDone
+		return os.ErrClosed
+	}
+	if len(k) == 0 || v == nil {
+		return os.ErrInvalid
 	}
 	data, err := io.ReadAll(v)
 	if err != nil {
@@ -123,7 +131,10 @@ func (t *txn) Set(ctx context.Context, k string, v io.Reader) error {
 // Delete removes the key-value pair with the given key.
 func (t *txn) Delete(ctx context.Context, k string) error {
 	if t.db == nil {
-		return sql.ErrTxDone
+		return os.ErrClosed
+	}
+	if len(k) == 0 {
+		return os.ErrInvalid
 	}
 	if err := t.tx.Delete([]byte(k)); err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
@@ -164,6 +175,10 @@ func (t *txn) Ascend(ctx context.Context, beg, end string, errp *error) iter.Seq
 			*errp = os.ErrInvalid
 			return
 		}
+		if t.db == nil {
+			*errp = os.ErrClosed
+			return
+		}
 
 		it := t.tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -200,6 +215,10 @@ func (t *txn) Descend(ctx context.Context, beg, end string, errp *error) iter.Se
 	return func(yield func(string, io.Reader) bool) {
 		if beg > end && end != "" {
 			*errp = os.ErrInvalid
+			return
+		}
+		if t.db == nil {
+			*errp = os.ErrClosed
 			return
 		}
 
