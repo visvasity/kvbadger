@@ -256,3 +256,91 @@ func (t *txn) Descend(ctx context.Context, beg, end string, errp *error) iter.Se
 		}
 	}
 }
+
+// AscendKeys implements the kv.KeyRanger interface, returning just the keys in
+// a given range through the iterator, in ascending order. Values are not
+// fetched (PrefetchValues is disabled), but visited keys still participate in
+// conflict detection exactly like Ascend, because badger records a read for
+// each key when the iterator item is accessed.
+func (t *txn) AscendKeys(ctx context.Context, beg, end string, errp *error) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		if beg > end && end != "" {
+			*errp = os.ErrInvalid
+			return
+		}
+		if t.db == nil {
+			*errp = os.ErrClosed
+			return
+		}
+
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+
+		it := t.tx.NewIterator(opts)
+		defer it.Close()
+
+		it.Rewind()
+		if beg != "" {
+			it.Seek([]byte(beg))
+		}
+
+		for ; it.Valid(); it.Next() {
+			item := it.Item()
+			key := string(item.KeyCopy(nil))
+
+			// Range includes begin and excludes end.
+			if end != "" && key >= end {
+				return
+			}
+			if !yield(key) {
+				return
+			}
+		}
+	}
+}
+
+// DescendKeys implements the kv.KeyRanger interface, returning just the keys in
+// a given range through the iterator, in descending order. Values are not
+// fetched (PrefetchValues is disabled), but visited keys still participate in
+// conflict detection exactly like Descend, because badger records a read for
+// each key when the iterator item is accessed.
+func (t *txn) DescendKeys(ctx context.Context, beg, end string, errp *error) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		if beg > end && end != "" {
+			*errp = os.ErrInvalid
+			return
+		}
+		if t.db == nil {
+			*errp = os.ErrClosed
+			return
+		}
+
+		opts := badger.DefaultIteratorOptions
+		opts.Reverse = true
+		opts.PrefetchValues = false
+
+		it := t.tx.NewIterator(opts)
+		defer it.Close()
+
+		it.Rewind()
+		if end != "" {
+			it.Seek([]byte(end))
+		}
+
+		for ; it.Valid(); it.Next() {
+			item := it.Item()
+			key := string(item.KeyCopy(nil))
+
+			// Range includes begin and excludes end.
+			if end != "" && key == end {
+				continue
+			}
+			if beg != "" && key < beg {
+				return
+			}
+			if !yield(key) {
+				return
+			}
+		}
+	}
+}
